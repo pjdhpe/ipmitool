@@ -935,46 +935,38 @@ void
 read_open_session_response(struct ipmi_rs * rsp, int offset)
 {
 	memset(&rsp->payload.open_session_response, 0,
-			 sizeof(rsp->payload.open_session_response));
+	       sizeof(rsp->payload.open_session_response));
 
-	 /*  Message tag */
-	 rsp->payload.open_session_response.message_tag = rsp->data[offset];
+	/*  Message tag */
+	rsp->payload.open_session_response.message_tag = rsp->data[offset];
 
-	 /* RAKP response code */
-	 rsp->payload.open_session_response.rakp_return_code = rsp->data[offset + 1];
+	/* RAKP response code */
+	rsp->payload.open_session_response.rakp_return_code = rsp->data[offset + 1];
 
-	 /* Maximum privilege level */
-	 rsp->payload.open_session_response.max_priv_level = rsp->data[offset + 2];
+	/* Maximum privilege level */
+	rsp->payload.open_session_response.max_priv_level = rsp->data[offset + 2];
 
-	 /*** offset + 3 is reserved ***/
+	/*** offset + 3 is reserved ***/
 
-	 /* Remote console session ID */
-	 memcpy(&(rsp->payload.open_session_response.console_id),
-			rsp->data + offset + 4,
-			4);
-	 #if WORDS_BIGENDIAN
-	 rsp->payload.open_session_response.console_id =
-		 BSWAP_32(rsp->payload.open_session_response.console_id);
-	 #endif
+	/* Remote console session ID */
+	rsp->payload.open_session_response.console_id
+		= ipmi32toh(&rsp->data[offset + 4]);
 
 	/* only tag, status, privlvl, and console id are returned if error */
-	 if (rsp->payload.open_session_response.rakp_return_code !=
-		  IPMI_RAKP_STATUS_NO_ERRORS)
-		 return;
+	if (rsp->payload.open_session_response.rakp_return_code
+	    != IPMI_RAKP_STATUS_NO_ERRORS)
+	{
+		return;
+	}
 
-	 /* BMC session ID */
-	 memcpy(&(rsp->payload.open_session_response.bmc_id),
-			rsp->data + offset + 8,
-			4);
-	 #if WORDS_BIGENDIAN
-	 rsp->payload.open_session_response.bmc_id =
-		 BSWAP_32(rsp->payload.open_session_response.bmc_id);
-	 #endif
+	/* BMC session ID */
+	rsp->payload.open_session_response.bmc_id
+		= ipmi32toh(&rsp->data[offset + 8]);
 
-	 /* And of course, our negotiated algorithms */
-	 rsp->payload.open_session_response.auth_alg      = rsp->data[offset + 16];
-	 rsp->payload.open_session_response.integrity_alg = rsp->data[offset + 24];
-	 rsp->payload.open_session_response.crypt_alg     = rsp->data[offset + 32];
+	/* And of course, our negotiated algorithms */
+	rsp->payload.open_session_response.auth_alg = rsp->data[offset + 16];
+	rsp->payload.open_session_response.integrity_alg = rsp->data[offset + 24];
+	rsp->payload.open_session_response.crypt_alg = rsp->data[offset + 32];
 }
 
 
@@ -1002,78 +994,74 @@ read_rakp2_message(
 					int offset,
 					uint8_t auth_alg)
 {
-	 int i;
+	int i;
 
-	 /*  Message tag */
-	 rsp->payload.rakp2_message.message_tag = rsp->data[offset];
+	/*  Message tag */
+	rsp->payload.rakp2_message.message_tag = rsp->data[offset];
 
-	 /* RAKP response code */
-	 rsp->payload.rakp2_message.rakp_return_code = rsp->data[offset + 1];
+	/* RAKP response code */
+	rsp->payload.rakp2_message.rakp_return_code = rsp->data[offset + 1];
 
-	 /* Console session ID */
-	 memcpy(&(rsp->payload.rakp2_message.console_id),
-			rsp->data + offset + 4,
-			4);
-	 #if WORDS_BIGENDIAN
-	 rsp->payload.rakp2_message.console_id =
-		 BSWAP_32(rsp->payload.rakp2_message.console_id);
-	 #endif
+	/* Console session ID */
+	rsp->payload.rakp2_message.console_id
+		= ipmi32toh(&rsp->data[offset + 4]);
 
-	 /* BMC random number */
-	 memcpy(&(rsp->payload.rakp2_message.bmc_rand),
-			rsp->data + offset + 8,
-			16);
-	 #if WORDS_BIGENDIAN
-	 lanplus_swap(rsp->payload.rakp2_message.bmc_rand, 16);
-	 #endif
+	/* BMC random number */
+	memcpy(&(rsp->payload.rakp2_message.bmc_rand),
+	       rsp->data + offset + 8,
+	       16);
+	#if WORDS_BIGENDIAN
+	lanplus_swap(rsp->payload.rakp2_message.bmc_rand, 16);
+	#endif
 
-	 /* BMC GUID */
-	 memcpy(&(rsp->payload.rakp2_message.bmc_guid),
-			rsp->data + offset + 24,
-			16);
-	 #if WORDS_BIGENDIAN
-	 lanplus_swap(rsp->payload.rakp2_message.bmc_guid, 16);
-	 #endif
-	 
-	 /* Key exchange authentication code */
-	 switch (auth_alg)
-	 {
-	 case  IPMI_AUTH_RAKP_NONE:
-		 /* Nothing to do here */
-		 break;
+	/* BMC GUID */
+	memcpy(&(rsp->payload.rakp2_message.bmc_guid),
+	       rsp->data + offset + 24,
+	       16);
+	#if WORDS_BIGENDIAN
+	lanplus_swap(rsp->payload.rakp2_message.bmc_guid, 16);
+	#endif
+	
+	/* Key exchange authentication code */
+	switch (auth_alg)
+	{
+		case  IPMI_AUTH_RAKP_NONE:
+			/* Nothing to do here */
+			break;
 
-	 case IPMI_AUTH_RAKP_HMAC_SHA1:
-		/* We need to copy 20 bytes */
-		for (i = 0; i < IPMI_SHA_DIGEST_LENGTH; ++i) {
-			rsp->payload.rakp2_message.key_exchange_auth_code[i] =
-				rsp->data[offset + 40 + i];
-		}
-		break;
+		case IPMI_AUTH_RAKP_HMAC_SHA1:
+			/* We need to copy 20 bytes */
+			for (i = 0; i < IPMI_SHA_DIGEST_LENGTH; ++i) {
+				rsp->payload.rakp2_message.key_exchange_auth_code[i]
+					= rsp->data[offset + 40 + i];
+			}
+			break;
 
-	 case IPMI_AUTH_RAKP_HMAC_MD5:
-		/* We need to copy 16 bytes */
-		for (i = 0; i < IPMI_MD5_DIGEST_LENGTH; ++i) {
-			rsp->payload.rakp2_message.key_exchange_auth_code[i] =
-				rsp->data[offset + 40 + i];
-		}
-		break;
+		case IPMI_AUTH_RAKP_HMAC_MD5:
+			/* We need to copy 16 bytes */
+			for (i = 0; i < IPMI_MD5_DIGEST_LENGTH; ++i) {
+				rsp->payload.rakp2_message.key_exchange_auth_code[i]
+					= rsp->data[offset + 40 + i];
+			}
+			break;
 
 #ifdef HAVE_CRYPTO_SHA256
-	 case IPMI_AUTH_RAKP_HMAC_SHA256:
-		/* We need to copy 32 bytes */
-		for (i = 0; i < IPMI_SHA256_DIGEST_LENGTH; ++i) {
-			rsp->payload.rakp2_message.key_exchange_auth_code[i] =
-				rsp->data[offset + 40 + i];
-		}
-		break;
+		case IPMI_AUTH_RAKP_HMAC_SHA256:
+			/* We need to copy 32 bytes */
+			for (i = 0; i < IPMI_SHA256_DIGEST_LENGTH; ++i) {
+				rsp->payload.rakp2_message.key_exchange_auth_code[i]
+					= rsp->data[offset + 40 + i];
+			}
+			break;
 #endif /* HAVE_CRYPTO_SHA256 */
 
-	 default:
-		lprintf(LOG_ERR, "read_rakp2_message: no support "
-			"for authentication algorithm 0x%x", auth_alg);
-		 assert(0);
-		 break;
-	 }
+		default:
+			lprintf(LOG_ERR,
+			        "read_rakp2_message: no support "
+			        "for authentication algorithm 0x%x", auth_alg);
+			assert(0);
+			break;
+	}
 }
 
 
@@ -1232,23 +1220,17 @@ read_session_data_v2x(
 	/* Session ID */
 	memcpy(&rsp->session.id, rsp->data + *offset, 4);
 	*offset += 4;
-	#if WORDS_BIGENDIAN
-	rsp->session.id = BSWAP_32(rsp->session.id);
-	#endif
+	rsp->session.id = ipmi32toh(&rsp->session.id);
 
 
 	/* Ignored, so far */
 	memcpy(&rsp->session.seq, rsp->data + *offset, 4);
 	*offset += 4;
-	#if WORDS_BIGENDIAN
-	rsp->session.seq = BSWAP_32(rsp->session.seq);
-	#endif		
+	rsp->session.seq = ipmi32toh(&rsp->session.seq);
 
 	memcpy(&rsp->session.msglen, rsp->data + *offset, 2);
 	*offset += 2;
-	#if WORDS_BIGENDIAN
-	rsp->session.msglen = BSWAP_16(rsp->session.msglen);
-	#endif
+	rsp->session.msglen = ipmi16toh(&rsp->session.msglen);
 }
 
 
@@ -2807,7 +2789,6 @@ ipmi_close_session_cmd(struct ipmi_intf * intf)
 	struct ipmi_rs * rsp;
 	struct ipmi_rq req;
 	uint8_t msg_data[4];
-	uint32_t bmc_session_lsbf;
 	uint8_t backupBridgePossible;
 
 	if (intf->session == NULL
@@ -2819,12 +2800,7 @@ ipmi_close_session_cmd(struct ipmi_intf * intf)
 	intf->target_addr = IPMI_BMC_SLAVE_ADDR;
 	bridgePossible = 0;
 
-	bmc_session_lsbf = intf->session->v2_data.bmc_id;
-#if WORDS_BIGENDIAN
-	bmc_session_lsbf = BSWAP_32(bmc_session_lsbf);
-#endif
-
-	memcpy(&msg_data, &bmc_session_lsbf, 4);
+	htoipmi32(&intf->session->v2_data.bmc_id, &msg_data);
 
 	memset(&req, 0, sizeof(req));
 	req.msg.netfn		= IPMI_NETFN_APP;
